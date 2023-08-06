@@ -8,8 +8,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/unitoftime/flow/net"
-	"github.com/unitoftime/flow/cod"
+	"github.com/unitoftime/envoy/net"
 )
 
 // Has
@@ -22,6 +21,8 @@ import (
 // 5. Automatic retries of messages?
 // 6. Message batching?
 // TODO: Maybe eventually migrate over to the auto generated serialization code
+
+// TODO: Get rid of *Buffer
 
 var ErrTimeout = errors.New("timeout reached")
 
@@ -49,7 +50,7 @@ const (
 // func (s *serdes) Marshal(v any) ([]byte, error) {
 // 	// return s.union.Serialize(v)
 
-// 	buf := cod.NewBuffer(1024)
+// 	buf := NewBuffer(1024)
 
 // 	switch msgDat := m.Data.(type) {
 // 	case Request:
@@ -254,7 +255,7 @@ func (d InterfaceDef[S, C]) NewServer(config *Config) *Client[S, C] {
 // TODO - I think I'd prefer this to be based on method name and not based on input argument type
 // TODO - reordering the definition, or switching between a message and an RPC will break api compatibility
 type serviceDef struct {
-	Requests, Responses *cod.UnionBuilder
+	Requests, Responses *UnionBuilder
 }
 
 func makeServiceDef(def any) serviceDef {
@@ -286,8 +287,8 @@ func makeServiceDef(def any) serviceDef {
 	}
 
 	return serviceDef{
-		Requests: cod.NewUnion(requests...),
-		Responses: cod.NewUnion(responses...),
+		Requests: NewUnion(requests...),
+		Responses: NewUnion(responses...),
 	}
 }
 
@@ -351,7 +352,7 @@ var sendBufPool = sync.Pool{
 		// The Pool's New function should generally only return pointer
 		// types, since a pointer can be put into the return interface
 		// value without an allocation:
-		return cod.NewBuffer(8 * 1024) // TODO!!!! - hardcoded
+		return NewBuffer(8 * 1024) // TODO!!!! - hardcoded
 	},
 }
 
@@ -398,7 +399,7 @@ func (c *Client[S, C]) start() {
 				continue
 			}
 
-			buf := cod.NewBufferFrom(dat)
+			buf := NewBufferFrom(dat)
 			wireType := buf.ReadUint8()
 			// if err != nil {
 			// 	fmt.Println("Envoy: data unmarshal error:", err)
@@ -439,7 +440,7 @@ func (c *Client[S, C]) start() {
 	}()
 }
 
-func (c *Client[S, C]) handleResponse(buf *cod.Buffer) error {
+func (c *Client[S, C]) handleResponse(buf *Buffer) error {
 	respId, err := buf.ReadUint32()
 	if err != nil { return err } // TODO: Should this error inform the doRpc call?
 
@@ -463,7 +464,7 @@ func (c *Client[S, C]) handleResponse(buf *cod.Buffer) error {
 }
 
 // func (c *Client[S, C]) handleRequest(rpcReq Request) error {
-func (c *Client[S, C]) handleRequest(buf *cod.Buffer) error {
+func (c *Client[S, C]) handleRequest(buf *Buffer) error {
 	reqId, err := buf.ReadUint32()
 	if err != nil { return err }
 
@@ -480,7 +481,7 @@ func (c *Client[S, C]) handleRequest(buf *cod.Buffer) error {
 	anyResp := handler(reqVal)
 
 	// Build response
-	sendBuf := sendBufPool.Get().(*cod.Buffer)
+	sendBuf := sendBufPool.Get().(*Buffer)
 	sendBuf.Reset()
 	defer sendBufPool.Put(sendBuf)
 
@@ -502,7 +503,7 @@ func (c *Client[S, C]) handleRequest(buf *cod.Buffer) error {
 	return nil
 }
 
-func (c *Client[S, C]) handleMessage(buf *cod.Buffer) error {
+func (c *Client[S, C]) handleMessage(buf *Buffer) error {
 	// TODO: codify this to remove the alloc
 	msgVal, err := c.serviceDef.Requests.Deserialize(buf)
 	if err != nil {
@@ -611,7 +612,7 @@ func makeMsgHandler[M any](handler func(M)) MessageHandlerFunc {
 }
 
 func (c *Client[S, C]) doRpc(req any, timeout time.Duration) (any, error) {
-	sendBuf := sendBufPool.Get().(*cod.Buffer)
+	sendBuf := sendBufPool.Get().(*Buffer)
 	sendBuf.Reset()
 
 	// Build RPC
@@ -637,7 +638,7 @@ func (c *Client[S, C]) doRpc(req any, timeout time.Duration) (any, error) {
 }
 
 func (c *Client[S, C]) doMsg(msg any) error {
-	sendBuf := sendBufPool.Get().(*cod.Buffer)
+	sendBuf := sendBufPool.Get().(*Buffer)
 	sendBuf.Reset()
 	defer sendBufPool.Put(sendBuf)
 
@@ -660,7 +661,7 @@ func (c *Client[S, C]) doMsg(msg any) error {
 
 // Encode a request into the buffer
 // Make a channel for the request
-func (c *Client[S, C]) encodeRequest(buf *cod.Buffer, req any) (uint32, chan any, error) {
+func (c *Client[S, C]) encodeRequest(buf *Buffer, req any) (uint32, chan any, error) {
 	reqId, respChan := c.generateReqId()
 
 	buf.WriteUint8(wireTypeRequest)

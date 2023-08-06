@@ -3,14 +3,17 @@ module github.com/unitoftime/envoy
 go 1.20
 
 require (
+	github.com/smallnest/goframe v1.0.0
 	github.com/unitoftime/cod v0.0.0-20230626194639-7603fae7c5d2
-	github.com/unitoftime/flow v0.0.0-20230806200807-8aa813b55715
+	github.com/unitoftime/rtcnet v0.0.0-20230627160613-88270d58a49d
+	nhooyr.io/websocket v1.8.7
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/klauspost/compress v1.10.3 // indirect
+	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
 	github.com/pion/ice/v2 v2.3.6 // indirect
@@ -28,13 +31,9 @@ require (
 	github.com/pion/turn/v2 v2.1.0 // indirect
 	github.com/pion/webrtc/v3 v3.2.9 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/smallnest/goframe v1.0.0 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
-	github.com/unitoftime/binary v1.0.20 // indirect
-	github.com/unitoftime/rtcnet v0.0.0-20230627160613-88270d58a49d // indirect
 	golang.org/x/crypto v0.9.0 // indirect
 	golang.org/x/net v0.10.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	nhooyr.io/websocket v1.8.7 // indirect
 )

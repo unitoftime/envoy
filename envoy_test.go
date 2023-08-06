@@ -5,7 +5,7 @@ import (
 	"time"
 	"testing"
 
-	"github.com/unitoftime/flow/net"
+	"github.com/unitoftime/envoy/net"
 
 	"github.com/unitoftime/cod/backend"
 )
