@@ -24,10 +24,11 @@ type PipeSocket struct {
 	recvMut sync.Mutex    // The mutex for multiple threads reading at the same time
 	recvBuf []byte        // The buffer that reads are buffered into
 
+	closeOnce sync.Once   // To ensure we only close once
 	closed atomic.Bool    // Used to indicate that the user has requested to close this ClientConn
 	connected atomic.Bool // Used to indicate that the underlying connection is still active
 
-	redialMu sync.Mutex
+	redialMu sync.Mutex     // For protecting the redial timer
 	redialTimer *time.Timer // Tracks the redial timer
 }
 
@@ -73,10 +74,10 @@ func (s *PipeSocket) disconnectTransport() error {
 	}
 	s.connected.Store(false)
 
-	// Automatically close the socket if it has disconnected and isn't configured to reconnect
-	if s.dialConfig == nil {
-		s.Close()
-	}
+	// // Automatically close the socket if it has disconnected and isn't configured to reconnect
+	// if s.dialConfig == nil {
+	// 	s.Close()
+	// }
 
 	if s.pipe != nil {
 		return s.pipe.Close()
@@ -94,20 +95,20 @@ func (s *PipeSocket) Closed() bool {
 }
 
 func (s *PipeSocket) Close() error {
-	alreadyClosed := s.closed.Load()
-	if alreadyClosed { return nil }
+	var closeErr error
+	s.closeOnce.Do(func() {
+		s.closed.Store(true)
 
-	s.closed.Store(true)
+		s.redialMu.Lock()
+		defer s.redialMu.Unlock()
+		if s.redialTimer != nil {
+			s.redialTimer.Stop()
+		}
 
-	s.redialMu.Lock()
-	defer s.redialMu.Unlock()
-	if s.redialTimer != nil {
-		s.redialTimer.Stop()
-	}
+		closeErr = s.disconnectTransport()
+	})
 
-	s.disconnectTransport()
-
-	return nil
+	return closeErr
 }
 
 func (s *PipeSocket) Write(dat []byte) (int, error) {
