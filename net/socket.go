@@ -15,7 +15,7 @@ import (
 // - Transport based sockets
 // --------------------------------------------------------------------------------
 type PipeSocket struct {
-	dialConfig *DialConfig // The config used for redialing, if nil, then the socket cant reconnect
+	dialer Dialer // The config used for redialing, if nil, then the socket cant reconnect
 
 	pipe Pipe         // The underlying network connection to send and receive on
 
@@ -40,9 +40,9 @@ func newGlobalSocket() *PipeSocket {
 }
 
 // Creates a socket spawned by a dialer (as opposed to a listener). These sockets can reconnect.
-func newDialSocket(c *DialConfig) *PipeSocket {
+func newDialSocket(dialer Dialer) *PipeSocket {
 	sock := newGlobalSocket()
-	sock.dialConfig = c
+	sock.dialer = dialer
 	return sock
 }
 
@@ -73,11 +73,6 @@ func (s *PipeSocket) disconnectTransport() error {
 		return nil
 	}
 	s.connected.Store(false)
-
-	// // Automatically close the socket if it has disconnected and isn't configured to reconnect
-	// if s.dialConfig == nil {
-	// 	s.Close()
-	// }
 
 	if s.pipe != nil {
 		return s.pipe.Close()
@@ -177,7 +172,7 @@ func (s *PipeSocket) triggerRedial(dur time.Duration) {
 }
 
 func (s *PipeSocket) redial() {
-	if s.dialConfig == nil { return } // If socket cant dial, then skip
+	if s.dialer == nil { return } // If socket cant dial, then skip
 	if s.Closed() { return } // If socket is closed, then never reconnect
 
 	go func() {
@@ -192,8 +187,9 @@ func (s *PipeSocket) redial() {
 			return
 		}
 
-		trans, err := s.dialConfig.dialPipe()
+		trans, err := s.dialer.DialPipe()
 		if err != nil {
+			fmt.Println("Error Dialing: ", err)
 			return
 		}
 

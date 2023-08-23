@@ -32,6 +32,7 @@ type Listener interface {
 	Addr() net.Addr
 }
 
+// TODO: This is basically a net.Conn
 type Pipe interface {
 	Read([]byte) (int, error)
 	Write([]byte) (int, error)
@@ -57,49 +58,25 @@ type Socket interface {
 // --------------------------------------------------------------------------------
 // - Dialer
 // --------------------------------------------------------------------------------
-
-// For dialing a socket
-type DialConfig struct {
-	Url string   // Note: We only use the [scheme]://[host] portion of this
-	TlsConfig *tls.Config
-
-	// These are generated based on the upper config
-	scheme string
-	host string
+func NewDialSocket(dialer Dialer) Socket {
+	sock := newDialSocket(dialer)
+	sock.triggerRedial(1 * time.Nanosecond)
+	return sock
 }
 
-// Returns a created socket which may not be connected, but will be actively trying to connect
-func (c *DialConfig) Dial() Socket {
+type Dialer interface {
+	DialPipe() (Pipe, error)
+}
+
+// TODO: Just pass host in directly instead of scheme (so we dont have to use this func)
+func parseSchemeHost(urlString string) (string, string) {
 	// Parse the config
-	u, err := url.Parse(c.Url)
+	u, err := url.Parse(urlString)
 	if err != nil {
 		// TODO - wrap this up in the creation of the dialconfig
 		panic(fmt.Sprintf("URL Parsing Error: %v", err))
 	}
-	c.scheme = u.Scheme
-	c.host = u.Host
-
-	sock := newDialSocket(c)
-
-	// TODO - would prefer to just immediately dial, but we cant block
-	// sock.redialTimer = time.AfterFunc(1, sock.redial)
-	// time.AfterFunc(1, sock.redial)
-	sock.triggerRedial(1 * time.Nanosecond)
-
-	return sock
-}
-
-func (c *DialConfig) dialPipe() (Pipe, error) {
-	fmt.Println("Redialing: ", c)
-	if c.scheme == "ws" || c.scheme == "wss" {
-		return dialWebsocket(c)
-	} else if c.scheme == "tcp" {
-		return dialTcp(c)
-	} else if c.scheme == "webrtc" {
-		return dialWebRtc(c)
-	}
-
-	return nil, fmt.Errorf("Failed to Dial, unknown scheme")
+	return u.Scheme, u.Host
 }
 
 // --------------------------------------------------------------------------------

@@ -40,10 +40,19 @@ func (t *wsPipe) Close() error {
 	return t.conn.Close()
 }
 
+
+type WebsocketDialer struct {
+	Url string
+	TlsConfig *tls.Config
+}
+func (d *WebsocketDialer) Dial() (Pipe, error) {
+	return dialWebsocket(d.Url, d.TlsConfig)
+}
+
 // Returns a connected socket or fails with an error
-func dialWebsocket(c *DialConfig) (*wsPipe, error) {
+func dialWebsocket(url string, tlsConfig *tls.Config) (*wsPipe, error) {
 	ctx, _ := context.WithTimeout(context.Background(), 5 * time.Second)
-	conn, err := dialWs(ctx, c.Url, c.TlsConfig)
+	conn, err := dialWs(ctx, url, tlsConfig)
 	if err != nil {
 		return nil, err
 	}

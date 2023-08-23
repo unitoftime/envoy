@@ -2,11 +2,18 @@ package net
 
 import (
 	"net"
+	"crypto/tls"
 	"github.com/unitoftime/rtcnet"
 )
 
-func dialWebRtc(c *DialConfig) (Pipe, error) {
-	conn, err := rtcnet.Dial(c.host, c.TlsConfig)
+type WebRtcDialer struct {
+	Url string
+	TlsConfig *tls.Config
+	Ordered bool
+}
+func (d WebRtcDialer) DialPipe() (Pipe, error) {
+	_, host := parseSchemeHost(d.Url)
+	conn, err := rtcnet.Dial(host, d.TlsConfig, d.Ordered)
 	return conn, err
 }
 
