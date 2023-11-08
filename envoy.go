@@ -408,30 +408,30 @@ func (c *Client[S, C]) start() {
 
 			switch wireType {
 			case wireTypeRequest:
-				go func() {
+				// go func() {
 					err := c.handleRequest(buf)
 					if err != nil {
 						fmt.Println("Envoy.Request error:", err)
 					}
 					receiveBufPool.Put(dat)
-				}()
+				// }()
 			case wireTypeResponse:
-				// TODO - this one may not need to be run in a goroutine. b/c it will exit quickly enough?
-				go func() {
+				// // TODO - this one may not need to be run in a goroutine. b/c it will exit quickly enough?
+				// go func() {
 					err := c.handleResponse(buf)
 					if err != nil {
 						fmt.Println("Envoy.Response error:", err)
 					}
 					receiveBufPool.Put(dat)
-				}()
+				// }()
 			case wireTypeMessage:
-				go func() {
+				// go func() {
 					err := c.handleMessage(buf)
 					if err != nil {
 						fmt.Println("Envoy.Message error:", err)
 					}
 					receiveBufPool.Put(dat)
-				}()
+				// }()
 			default:
 				fmt.Printf("Envoy: unknown wire type error: %d\n", wireType)
 				receiveBufPool.Put(dat)
