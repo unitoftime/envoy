@@ -1,11 +1,11 @@
 package net
 
 import (
-	"fmt"
-	"time"
-	"math/rand"
 	"errors"
+	"fmt"
 	"io"
+	"math/rand"
+	"time"
 
 	"sync"
 	"sync/atomic"
@@ -30,6 +30,9 @@ type PipeSocket struct {
 
 	redialMu sync.Mutex     // For protecting the redial timer
 	redialTimer *time.Timer // Tracks the redial timer
+
+	ingress atomic.Int64
+	egress atomic.Int64
 }
 
 func newGlobalSocket() *PipeSocket {
@@ -81,6 +84,13 @@ func (s *PipeSocket) disconnectTransport() error {
 	return nil
 }
 
+func (s *PipeSocket) ReadEgress() int64 {
+	return s.egress.Swap(0)
+}
+func (s *PipeSocket) ReadIngress() int64 {
+	return s.ingress.Swap(0)
+}
+
 func (s *PipeSocket) Connected() bool {
 	return s.connected.Load()
 }
@@ -124,6 +134,7 @@ func (s *PipeSocket) Write(dat []byte) (int, error) {
 		err = fmt.Errorf("%w: %s", ErrNetwork, err)
 		return 0, err
 	}
+	s.egress.Add(int64(n))
 	return n, nil
 }
 
@@ -150,6 +161,8 @@ func (s *PipeSocket) Read(buf []byte) (int, error) {
 		err = fmt.Errorf("%w: %s", ErrNetwork, err)
 		return 0, err
 	}
+	s.ingress.Add(int64(n))
+
 	return n, nil
 	// if n <= 0 { return nil } // There was no message, and no error (likely a keepalive)
 	// return nil

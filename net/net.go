@@ -1,14 +1,14 @@
 package net
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 	"time"
 
-	"net"
-	"net/url"
-	"net/http"
 	"crypto/tls"
+	"net"
+	"net/http"
+	"net/url"
 )
 
 // TODO - Ensure sent messages remain under this
@@ -53,6 +53,11 @@ type Socket interface {
 	Connected() bool
 	Closed() bool
 	// Wait() // Wait for the connection to stabalize
+
+	// Reads and clears the number egress bytes
+	ReadEgress() int64
+	// Reads and clears the number ingress bytes
+	ReadIngress() int64
 }
 
 // --------------------------------------------------------------------------------
