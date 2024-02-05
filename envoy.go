@@ -1,12 +1,12 @@
 package envoy
 
 import (
-	"fmt"
-	"time"
 	"errors"
+	"fmt"
 	"math/rand"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/unitoftime/envoy/net"
 )
@@ -190,13 +190,17 @@ func (d *RpcDef[Req, Resp]) Register(handler func(Req) Resp) {
 	d.handler = makeRpcHandler(handler)
 }
 
-func (d RpcDef[Req, Resp]) Call(req Req) (Resp, error) {
+func (d RpcDef[Req, Resp]) CallTimeout(req Req, timeout time.Duration) (Resp, error) {
 	var resp Resp
-	anyResp, err := d.client.doRpc(req, 15 * time.Second) // TODO: configurable
+	anyResp, err := d.client.doRpc(req, timeout)
 	if err != nil { return resp, err }
 	resp, ok := anyResp.(Resp)
 	if !ok { panic("Mismatched type!") }
 	return resp, nil
+}
+
+func (d RpcDef[Req, Resp]) Call(req Req) (Resp, error) {
+	return d.CallTimeout(req, 15 * time.Second) // Note: Default is kinda high
 }
 
 func (d RpcDef[Req, Resp]) Handler() (reflect.Type, HandlerFunc) {
