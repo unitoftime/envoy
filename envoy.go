@@ -351,6 +351,14 @@ func (c *Client[S, C]) Closed() bool {
 	return c.sock.Closed()
 }
 
+func (c *Client[S, C]) ReadIngress() int64 {
+	return c.sock.ReadIngress()
+}
+
+func (c *Client[S, C]) ReadEgress() int64 {
+	return c.sock.ReadEgress()
+}
+
 var sendBufPool = sync.Pool{
 	New: func() any {
 		// The Pool's New function should generally only return pointer

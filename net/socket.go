@@ -22,7 +22,6 @@ type PipeSocket struct {
 	// Note: sendMut I think is needed now that I'm using goframe
 	sendMut sync.Mutex    // The mutex for multiple threads writing at the same time
 	recvMut sync.Mutex    // The mutex for multiple threads reading at the same time
-	recvBuf []byte        // The buffer that reads are buffered into
 
 	closeOnce sync.Once   // To ensure we only close once
 	closed atomic.Bool    // Used to indicate that the user has requested to close this ClientConn
@@ -37,7 +36,6 @@ type PipeSocket struct {
 
 func newGlobalSocket() *PipeSocket {
 	sock := PipeSocket{
-		recvBuf: make([]byte, MaxRecvMsgSize),
 	}
 	return &sock
 }
