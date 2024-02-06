@@ -375,14 +375,7 @@ var sendBufPool = sync.Pool{
 }
 
 func (c *Client[S, C]) start() {
-	var receiveBufPool = sync.Pool{
-		New: func() any {
-			// The Pool's New function should generally only return pointer
-			// types, since a pointer can be put into the return interface
-			// value without an allocation:
-			return make([]byte, c.maxRecvPacketSize)
-		},
-	}
+	recvBuf := make([]byte, c.maxRecvPacketSize)
 
 	go func() {
 		for {
@@ -390,69 +383,55 @@ func (c *Client[S, C]) start() {
 				return // sockets can never redial
 			}
 
-			dat := receiveBufPool.Get().([]byte)
-			n, err := c.sock.Read(dat)
+			n, err := c.sock.Read(recvBuf)
 			if err != nil {
-				receiveBufPool.Put(dat)
 				// TODO - I need a better way to wait if the socket is disconnected. If I remove the sleep then we will spin when disconnected
 				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 
-			// if n > 30000 {
-			// 	fmt.Println("Envoy.Recv: ", n)
-			// }
+			if n == 0 { continue } // Empty message
 
-			if n == 0 {
-				// fmt.Println("Envoy.Recv: empty! ", n)
-				receiveBufPool.Put(dat)
-				continue
-			} // Empty message
-
-			if n >= len(dat) {
+			if n >= len(recvBuf) {
 				// TODO: need to handle this case by dynamically resizing the receive buffer (within reason)
 				// Full message
-				fmt.Println("Envoy error: message was too big: ", n)
-				receiveBufPool.Put(dat)
+				logger.Error().
+					Int("msgSize", n).
+					Int("maxSize", len(recvBuf)).
+					Msg("Envoy: message was too big")
+
 				continue
 			}
 
-			buf := NewBufferFrom(dat)
+			buf := NewBufferFrom(recvBuf)
 			wireType := buf.ReadUint8()
-			// if err != nil {
-			// 	fmt.Println("Envoy: data unmarshal error:", err)
-			// 	continue
-			// }
 
 			switch wireType {
 			case wireTypeRequest:
-				// go func() {
-					err := c.handleRequest(buf)
-					if err != nil {
-						fmt.Println("Envoy.Request error:", err)
-					}
-					receiveBufPool.Put(dat)
-				// }()
+				err := c.handleRequest(buf)
+				if err != nil {
+					logger.Error().
+						Err(err).
+						Msg("Envoy: Request Handler")
+				}
 			case wireTypeResponse:
-				// // TODO - this one may not need to be run in a goroutine. b/c it will exit quickly enough?
-				// go func() {
-					err := c.handleResponse(buf)
-					if err != nil {
-						fmt.Println("Envoy.Response error:", err)
-					}
-					receiveBufPool.Put(dat)
-				// }()
+				err := c.handleResponse(buf)
+				if err != nil {
+					logger.Error().
+						Err(err).
+						Msg("Envoy: Response Handler")
+				}
 			case wireTypeMessage:
-				// go func() {
-					err := c.handleMessage(buf)
-					if err != nil {
-						fmt.Println("Envoy.Message error:", err)
-					}
-					receiveBufPool.Put(dat)
-				// }()
+				err := c.handleMessage(buf)
+				if err != nil {
+					logger.Error().
+						Err(err).
+						Msg("Envoy: Message Handler")
+				}
 			default:
-				fmt.Printf("Envoy: unknown wire type error: %d\n", wireType)
-				receiveBufPool.Put(dat)
+				logger.Error().
+					Uint8("wireType", wireType).
+					Msg("Envoy: Message Handler")
 			}
 		}
 	}()
@@ -481,7 +460,6 @@ func (c *Client[S, C]) handleResponse(buf *Buffer) error {
 	return nil
 }
 
-// func (c *Client[S, C]) handleRequest(rpcReq Request) error {
 func (c *Client[S, C]) handleRequest(buf *Buffer) error {
 	reqId, err := buf.ReadUint32()
 	if err != nil { return err }
@@ -513,9 +491,17 @@ func (c *Client[S, C]) handleRequest(buf *Buffer) error {
 	}
 
 	// TODO - check that n is correct?
-	_, err = c.sock.Write(sendBuf.Bytes())
+	dat := sendBuf.Bytes()
+	expectedSendLength := len(dat)
+	actualSendLength, err := c.sock.Write(dat)
 	if err != nil {
 		return err
+	}
+	if expectedSendLength != actualSendLength {
+		logger.Error().
+			Int("expectedSendLength", expectedSendLength).
+			Int("actualSendLength", actualSendLength).
+			Msg("Envoy: handleRequest Send: mismatched send size")
 	}
 
 	return nil
@@ -717,7 +703,8 @@ func (c *Client[S, C]) cleanupResponseChannel(id uint32) {
 	channel, ok := c.activeCalls[id]
 	if !ok {
 		// This is weird, the channel didn't exist but should have. Probably not worth panicking on
-		fmt.Println("Envoy: Tried to cleanup channel that was already cleaned up")
+		logger.Error().
+			Msg("Envoy: Tried to cleanup channel that was already cleaned up")
 		return
 	}
 

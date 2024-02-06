@@ -2,7 +2,6 @@ package net
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"math/rand"
 	"time"
@@ -122,6 +121,7 @@ func (s *PipeSocket) Write(dat []byte) (int, error) {
 	if !s.Connected() {
 		return 0, ErrDisconnected
 	}
+	// TODO: is this mutex needed anymore?
 	s.sendMut.Lock()
 	defer s.sendMut.Unlock()
 
@@ -129,7 +129,9 @@ func (s *PipeSocket) Write(dat []byte) (int, error) {
 	n, err := s.pipe.Write(dat)
 	if err != nil {
 		s.disconnectTransport()
-		err = fmt.Errorf("%w: %s", ErrNetwork, err)
+
+		err = errors.Join(ErrNetwork, err)
+		// err = fmt.Errorf("%w: %s", ErrNetwork, err)
 		return 0, err
 	}
 	s.egress.Add(int64(n))
@@ -145,6 +147,7 @@ func (s *PipeSocket) Read(buf []byte) (int, error) {
 		return 0, ErrDisconnected
 	}
 
+	// TODO: is this mutex needed anymore?
 	s.recvMut.Lock()
 	defer s.recvMut.Unlock()
 
@@ -156,7 +159,9 @@ func (s *PipeSocket) Read(buf []byte) (int, error) {
 		if errors.Is(err, io.EOF) {
 			return 0, err
 		}
-		err = fmt.Errorf("%w: %s", ErrNetwork, err)
+
+		err = errors.Join(ErrNetwork, err)
+		// err = fmt.Errorf("%w: %s", ErrNetwork, err)
 		return 0, err
 	}
 	s.ingress.Add(int64(n))
@@ -200,7 +205,9 @@ func (s *PipeSocket) redial() {
 
 		trans, err := s.dialer.DialPipe()
 		if err != nil {
-			fmt.Println("Error Dialing: ", err)
+			logger.Error().
+				Err(err).
+				Msg("Envoy.Pipesocket failed to dial")
 			return
 		}
 
