@@ -114,7 +114,7 @@ type Message struct {
 // Internal interfaces
 type rpcClient interface {
 	doRpc(any, time.Duration) (any, error)
-	doMsg(any) error
+	doMsg(any) (int, error)
 }
 
 type MsgDefinition interface {
@@ -163,6 +163,12 @@ func (d MsgDef[A]) MsgType() any {
 }
 
 func (d MsgDef[A]) Send(msg A) error {
+	_, err := d.client.doMsg(msg)
+	return err
+}
+
+// Sends the message and returns the number of bytes sent
+func (d MsgDef[A]) SendGetSize(msg A) (int, error) {
 	return d.client.doMsg(msg)
 }
 
@@ -649,7 +655,7 @@ func (c *Client[S, C]) doRpc(req any, timeout time.Duration) (any, error) {
 	}
 }
 
-func (c *Client[S, C]) doMsg(msg any) error {
+func (c *Client[S, C]) doMsg(msg any) (int, error) {
 	sendBuf := sendBufPool.Get().(*Buffer)
 	sendBuf.Reset()
 	defer sendBufPool.Put(sendBuf)
@@ -657,18 +663,18 @@ func (c *Client[S, C]) doMsg(msg any) error {
 	sendBuf.WriteUint8(wireTypeMessage)
 
 	err := c.clientDef.Requests.Serialize(sendBuf, msg)
-	if err != nil { return err }
+	if err != nil { return 0, err }
 
 	// println("Envoy.doMsg: ", len(sendBuf.Bytes()))
 
 	// Send over socket
 	// TODO - check that n is correct?
-	_, err = c.sock.Write(sendBuf.Bytes())
+	n, err := c.sock.Write(sendBuf.Bytes())
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	return nil
+	return n, nil
 }
 
 // Encode a request into the buffer
