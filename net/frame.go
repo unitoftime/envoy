@@ -2,11 +2,12 @@ package net
 
 import (
 	// "fmt"
+	"encoding/binary"
 	"net"
 	"time"
-	"encoding/binary"
 
 	// TODO - Implement my own framing?
+
 	"github.com/smallnest/goframe"
 )
 
@@ -41,7 +42,10 @@ func (f *FrameConn) Read(b []byte) (int, error) {
 
 	length := copy(b, tmpBuf)
 	// if length >= len(b) {
-	// 	fmt.Println("FrameConn: Received message larger than read buffer:", len(tmpBuf), len(b))
+	// 	log.Error().
+	// 		Int("Receved", len(tmpBuf)).
+	// 		Int("Expected", len(b)).
+	// 		Msg("Envoy.Net.FrameConn: Received message larger than read buffer")
 	// }
 
 	return length, nil

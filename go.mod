@@ -3,7 +3,7 @@ module github.com/unitoftime/envoy
 go 1.20
 
 require (
-	github.com/smallnest/goframe v1.0.0
+	github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b
 	github.com/unitoftime/cod v0.0.0-20230626194639-7603fae7c5d2
 	github.com/unitoftime/rtcnet v0.0.0-20230806200240-066c7584accc
 	nhooyr.io/websocket v1.8.7

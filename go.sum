@@ -118,6 +118,8 @@ github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZN
 github.com/sclevine/agouti v3.0.0+incompatible/go.mod h1:b4WX9W9L1sfQKXeJf1mUTLZKJ48R1S7H23Ji7oFO5Bw=
 github.com/smallnest/goframe v1.0.0 h1:ywsSz9P5BFiqn39w8iFDENTdqN44v+B5bp1PbCH+PVw=
 github.com/smallnest/goframe v1.0.0/go.mod h1:Dy8560GXrB6w5OJnVBU71dJtSyINdnqHHe6atDaZX00=
+github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b h1:k87K08sJQW/F11jgObcogd9gDUH0CdkptDviUuDH/8s=
+github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b/go.mod h1:Dy8560GXrB6w5OJnVBU71dJtSyINdnqHHe6atDaZX00=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=

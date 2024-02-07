@@ -622,7 +622,10 @@ func (c *Client[S, C]) doRpc(req any, timeout time.Duration) (any, error) {
 	// Build RPC
 	reqId, respChan, err := c.encodeRequest(sendBuf, req)
 	defer c.cleanupResponseChannel(reqId) // Even if we fail, we definitely created a channel. so we need to make sure we clean that up. This code is coupled to encodeRequest
-	if err != nil { return nil, err }
+	if err != nil {
+		sendBufPool.Put(sendBuf)
+		return nil, err
+	}
 
 	// Send over socket
 	// TODO - retry sending? Or push to a queue to be batch sent?

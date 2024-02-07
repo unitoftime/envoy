@@ -1,13 +1,13 @@
 package net
 
 import (
+	"context"
+	"crypto/tls"
 	"errors"
-	"sync/atomic"
-	"time"
 	"net"
 	"net/http"
-	"crypto/tls"
-	"context"
+	"sync/atomic"
+	"time"
 
 	"nhooyr.io/websocket"
 )
@@ -45,7 +45,7 @@ type WebsocketDialer struct {
 	Url string
 	TlsConfig *tls.Config
 }
-func (d *WebsocketDialer) Dial() (Pipe, error) {
+func (d WebsocketDialer) DialPipe() (Pipe, error) {
 	return dialWebsocket(d.Url, d.TlsConfig)
 }
 
