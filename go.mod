@@ -6,14 +6,13 @@ require (
 	github.com/rs/zerolog v1.32.0
 	github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b
 	github.com/unitoftime/cod v0.0.0-20230626194639-7603fae7c5d2
-	github.com/unitoftime/rtcnet v0.0.0-20240215180151-cd345823cc98
+	github.com/unitoftime/rtcnet v0.0.0-20240215181006-096c1a1978e1
 	nhooyr.io/websocket v1.8.10
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/klauspost/compress v1.17.6 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
