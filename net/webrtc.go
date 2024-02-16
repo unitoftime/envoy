@@ -3,6 +3,7 @@ package net
 import (
 	"crypto/tls"
 	"net"
+	"strings"
 
 	"github.com/unitoftime/rtcnet"
 )
@@ -12,10 +13,23 @@ type WebRtcDialer struct {
 	TlsConfig *tls.Config
 	Ordered bool
 	IceServers []string
+	WebsocketFallback bool
 }
 func (d WebRtcDialer) DialPipe() (Pipe, error) {
 	_, host := parseSchemeHost(d.Url)
 	conn, err := rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
+
+	if d.WebsocketFallback {
+		if err != nil {
+			// logger.Error().
+			// 	Err(err).
+			// 	Msg("Failed to dial webrtc. Trying websockets")
+			fallbackPath := strings.ReplaceAll(d.Url, "webrtc", "wss")
+			fallbackPath = fallbackPath + "/wss"
+			wsConn, wsErr := dialWebsocket(fallbackPath, d.TlsConfig)
+			return wsConn, wsErr
+		}
+	}
 	return conn, err
 }
 
