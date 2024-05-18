@@ -27,6 +27,10 @@ func dialTcp(host string) (*tcpPipe, error) {
 	return &tcpPipe{framedConn}, nil
 }
 
+func (t *tcpPipe) Transport() string {
+	return "tcp"
+}
+
 func (t *tcpPipe) Read(b []byte) (int, error) {
 	return t.conn.Read(b)
 }

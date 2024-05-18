@@ -31,6 +31,7 @@ type PipeSocket struct {
 
 	ingress atomic.Int64
 	egress atomic.Int64
+	transport string // TODO: This is currently only available from the listener side
 }
 
 func newGlobalSocket() *PipeSocket {
@@ -49,7 +50,7 @@ func newDialSocket(dialer Dialer) *PipeSocket {
 // Creates a socket spawned by a listener (as opposed to a dialer). These sockets can't reconnect, the dialer-side socket must reconnect by redialing the listener and getting re-accepted.
 func newAcceptedSocket(pipe Pipe) *PipeSocket {
 	sock := newGlobalSocket()
-
+	sock.transport = pipe.Transport()
 	sock.connectTransport(pipe)
 
 	return sock
@@ -65,6 +66,7 @@ func (s *PipeSocket) connectTransport(pipe Pipe) {
 	// TODO - ensure that we aren't already connected?
 	s.pipe = pipe
 	s.connected.Store(true)
+	// TODO: Set transport string based on pipe
 }
 
 func (s *PipeSocket) disconnectTransport() error {
@@ -73,6 +75,7 @@ func (s *PipeSocket) disconnectTransport() error {
 		return nil
 	}
 	s.connected.Store(false)
+	// TODO: Clear transport string based on pipe
 
 	if s.pipe != nil {
 		return s.pipe.Close()
@@ -86,6 +89,9 @@ func (s *PipeSocket) ReadEgress() int64 {
 }
 func (s *PipeSocket) ReadIngress() int64 {
 	return s.ingress.Swap(0)
+}
+func (s *PipeSocket) Transport() string {
+	return s.transport
 }
 
 func (s *PipeSocket) Connected() bool {

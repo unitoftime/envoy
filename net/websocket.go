@@ -27,6 +27,10 @@ func newWsPipe(wsConn *websocket.Conn) *wsPipe {
 	return pipe
 }
 
+func (t *wsPipe) Transport() string {
+	return "wss"
+}
+
 func (t *wsPipe) Read(b []byte) (int, error) {
 	return t.conn.Read(b)
 }

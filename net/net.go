@@ -40,6 +40,15 @@ type Pipe interface {
 
 	// SetReadTimeout(time.Duration)
 	// SetWriteTimeout(time.Duration)
+	Transport() string
+}
+
+type pipeWrapper struct {
+	net.Conn
+	transport string
+}
+func (p pipeWrapper) Transport() string {
+	return p.transport
 }
 
 type Socket interface {
@@ -58,6 +67,7 @@ type Socket interface {
 	ReadEgress() int64
 	// Reads and clears the number ingress bytes
 	ReadIngress() int64
+	Transport() string
 }
 
 // --------------------------------------------------------------------------------

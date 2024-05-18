@@ -69,7 +69,16 @@ func (l *rtcListener) Accept() (Socket, error) {
 		return nil, err
 	}
 
-	return newAcceptedSocket(c), nil
+	pipe := pipeWrapper{
+		Conn: c,
+		transport: "webrtc",
+	}
+	_, isRtc := c.(*rtcnet.Conn)
+	if !isRtc {
+		pipe.transport = "wss"
+	}
+
+	return newAcceptedSocket(pipe), nil
 }
 func (l *rtcListener) Close() error {
 	return l.listener.Close()
