@@ -20,14 +20,14 @@ func (d WebRtcDialer) DialPipe() (Pipe, error) {
 	_, host := parseSchemeHost(d.Url)
 	conn, err := rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
 	if err == nil {
-		return conn, nil
+		return pipeWrapper{conn, "webrtc"}, nil
 	}
 
 	// Retry once
 	time.Sleep(3 * time.Second)
 	conn, err = rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
 	if err == nil {
-		return conn, nil
+		return pipeWrapper{conn, "webrtc"}, nil
 	}
 
 	// Fallback to websockets if available
@@ -40,7 +40,7 @@ func (d WebRtcDialer) DialPipe() (Pipe, error) {
 		wsConn, wsErr := dialWebsocket(fallbackPath, d.TlsConfig)
 		return wsConn, wsErr
 	}
-	return conn, err
+	return pipeWrapper{conn, "wss"}, err
 }
 
 func newWebRtcListener(c *ListenConfig) (*rtcListener, error) {
