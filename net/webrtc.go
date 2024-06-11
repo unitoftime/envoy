@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/unitoftime/rtcnet"
 )
@@ -24,7 +23,6 @@ func (d WebRtcDialer) DialPipe() (Pipe, error) {
 	}
 
 	// Retry once
-	time.Sleep(3 * time.Second)
 	conn, err = rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
 	if err == nil {
 		return pipeWrapper{conn, "webrtc"}, nil
