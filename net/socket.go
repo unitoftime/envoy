@@ -66,7 +66,7 @@ func (s *PipeSocket) connectTransport(pipe Pipe) {
 	// TODO - ensure that we aren't already connected?
 	s.pipe = pipe
 	s.connected.Store(true)
-	// TODO: Set transport string based on pipe
+	s.transport = pipe.Transport()  // TOOD: Is this thread safe?
 }
 
 func (s *PipeSocket) disconnectTransport() error {
@@ -75,7 +75,7 @@ func (s *PipeSocket) disconnectTransport() error {
 		return nil
 	}
 	s.connected.Store(false)
-	// TODO: Clear transport string based on pipe
+	s.transport = "" // TOOD: Is this thread safe?
 
 	if s.pipe != nil {
 		return s.pipe.Close()
