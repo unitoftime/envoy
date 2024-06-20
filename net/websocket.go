@@ -55,7 +55,7 @@ func (d WebsocketDialer) DialPipe() (Pipe, error) {
 
 // Returns a connected socket or fails with an error
 func dialWebsocket(url string, tlsConfig *tls.Config) (*wsPipe, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 5 * time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 10 * time.Second)
 	conn, err := dialWs(ctx, url, tlsConfig)
 	if err != nil {
 		return nil, err

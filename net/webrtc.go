@@ -1,9 +1,12 @@
 package net
 
 import (
+	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/unitoftime/rtcnet"
 )
@@ -16,29 +19,69 @@ type WebRtcDialer struct {
 	WebsocketFallback bool
 }
 func (d WebRtcDialer) DialPipe() (Pipe, error) {
-	_, host := parseSchemeHost(d.Url)
-	conn, err := rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
-	if err == nil {
-		return pipeWrapper{conn, "webrtc"}, nil
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20 * time.Second)
+	defer cancel()
 
-	// Retry once
-	conn, err = rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
-	if err == nil {
-		return pipeWrapper{conn, "webrtc"}, nil
+	rtcPipe := make(chan Pipe)
+	go func () {
+		_, host := parseSchemeHost(d.Url)
+
+		maxAttempts := 2
+		for i := 0; i < maxAttempts; i++ {
+			conn, err := rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
+			if err == nil {
+				rtcPipe <- pipeWrapper{conn, "webrtc"}
+				return
+			} else {
+				logger.Error().Err(err).Int("Attempt", i).Msg("Failed to dial webrtc")
+			}
+		}
+
+		cancel()
+	}()
+
+	select {
+	case pipe := <-rtcPipe:
+		return pipe, nil
+	case <-ctx.Done():
+		// Do nothing, just finish
 	}
 
 	// Fallback to websockets if available
 	if d.WebsocketFallback {
-		// logger.Error().
-		// 	Err(err).
-		// 	Msg("Failed to dial webrtc. Trying websockets")
+		logger.Error().Msg("failed to dial webrtc. fallback to wss")
 		fallbackPath := strings.ReplaceAll(d.Url, "webrtc", "wss")
 		fallbackPath = fallbackPath + "/wss"
 		wsConn, wsErr := dialWebsocket(fallbackPath, d.TlsConfig)
 		return wsConn, wsErr
 	}
-	return pipeWrapper{conn, "wss"}, err
+
+	return nil, errors.New("failed to dial")
+
+
+	// _, host := parseSchemeHost(d.Url)
+	// conn, err := rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
+	// if err == nil {
+	// 	return pipeWrapper{conn, "webrtc"}, nil
+	// }
+
+	// // Retry once
+	// conn, err = rtcnet.Dial(host, d.TlsConfig, d.Ordered, d.IceServers)
+	// if err == nil {
+	// 	return pipeWrapper{conn, "webrtc"}, nil
+	// }
+
+	// // Fallback to websockets if available
+	// if d.WebsocketFallback {
+	// 	// logger.Error().
+	// 	// 	Err(err).
+	// 	// 	Msg("Failed to dial webrtc. Trying websockets")
+	// 	fallbackPath := strings.ReplaceAll(d.Url, "webrtc", "wss")
+	// 	fallbackPath = fallbackPath + "/wss"
+	// 	wsConn, wsErr := dialWebsocket(fallbackPath, d.TlsConfig)
+	// 	return wsConn, wsErr
+	// }
+	// return pipeWrapper{conn, "wss"}, err
 }
 
 func newWebRtcListener(c *ListenConfig) (*rtcListener, error) {
