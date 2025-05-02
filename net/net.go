@@ -38,6 +38,12 @@ type Pipe interface {
 	Write([]byte) (int, error)
 	Close() error
 
+	// LocalAddr returns the local network address, if known.
+	LocalAddr() net.Addr
+
+	// RemoteAddr returns the remote network address, if known.
+	RemoteAddr() net.Addr
+
 	// SetReadTimeout(time.Duration)
 	// SetWriteTimeout(time.Duration)
 	Transport() string
@@ -68,6 +74,12 @@ type Socket interface {
 	// Reads and clears the number ingress bytes
 	ReadIngress() int64
 	Transport() string
+
+	// LocalAddr returns the local network address, if known.
+	LocalAddr() net.Addr
+
+	// RemoteAddr returns the remote network address, if known.
+	RemoteAddr() net.Addr
 }
 
 // --------------------------------------------------------------------------------

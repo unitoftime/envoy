@@ -30,6 +30,12 @@ func newWsPipe(wsConn *websocket.Conn) *wsPipe {
 func (t *wsPipe) Transport() string {
 	return "wss"
 }
+func (s *wsPipe) LocalAddr() net.Addr {
+	return s.conn.LocalAddr()
+}
+func (s *wsPipe) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
+}
 
 func (t *wsPipe) Read(b []byte) (int, error) {
 	return t.conn.Read(b)

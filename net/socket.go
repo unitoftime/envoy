@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"math/rand"
+	"net"
 	"time"
 
 	"sync"
@@ -92,6 +93,13 @@ func (s *PipeSocket) ReadIngress() int64 {
 }
 func (s *PipeSocket) Transport() string {
 	return s.transport
+}
+
+func (s *PipeSocket) LocalAddr() net.Addr {
+	return s.pipe.LocalAddr()
+}
+func (s *PipeSocket) RemoteAddr() net.Addr {
+	return s.pipe.RemoteAddr()
 }
 
 func (s *PipeSocket) Connected() bool {

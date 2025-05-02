@@ -30,6 +30,12 @@ func dialTcp(host string) (*tcpPipe, error) {
 func (t *tcpPipe) Transport() string {
 	return "tcp"
 }
+func (s *tcpPipe) LocalAddr() net.Addr {
+	return s.conn.LocalAddr()
+}
+func (s *tcpPipe) RemoteAddr() net.Addr {
+	return s.conn.RemoteAddr()
+}
 
 func (t *tcpPipe) Read(b []byte) (int, error) {
 	return t.conn.Read(b)
