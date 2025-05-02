@@ -8,7 +8,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b
 	github.com/unitoftime/cod v0.0.0-20230626194639-7603fae7c5d2
-	github.com/unitoftime/rtcnet v0.0.0-20250502181818-ef26bf31ca64
+	github.com/unitoftime/rtcnet v0.0.0-20250502182218-6f85c39cd88b
 	nhooyr.io/websocket v1.8.17
 )
 
