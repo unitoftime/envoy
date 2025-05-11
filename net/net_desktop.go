@@ -1,14 +1,15 @@
+//go:build !js
 // +build !js
 
 package net
 
 import (
-	"time"
 	"context"
-	"net/http"
 	"crypto/tls"
+	"net/http"
+	"time"
 
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 func dialWs(ctx context.Context, url string, tlsConfig *tls.Config) (*websocket.Conn, error) {

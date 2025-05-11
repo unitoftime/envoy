@@ -5,11 +5,11 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
+	github.com/coder/websocket v1.8.13
 	github.com/rs/zerolog v1.34.0
 	github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b
 	github.com/unitoftime/cod v0.0.0-20230626194639-7603fae7c5d2
-	github.com/unitoftime/rtcnet v0.0.0-20250502183242-2b995f9db36f
-	nhooyr.io/websocket v1.8.17
+	github.com/unitoftime/rtcnet v0.0.0-20250511194213-2e65dbda1638
 )
 
 require (
@@ -33,7 +33,7 @@ require (
 	github.com/pion/turn/v4 v4.0.1 // indirect
 	github.com/pion/webrtc/v4 v4.1.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
-	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/crypto v0.38.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )
