@@ -55,13 +55,12 @@ type WebsocketDialer struct {
 	Url string
 	TlsConfig *tls.Config
 }
-func (d WebsocketDialer) DialPipe() (Pipe, error) {
-	return dialWebsocket(d.Url, d.TlsConfig)
+func (d WebsocketDialer) DialPipe(ctx context.Context) (Pipe, error) {
+	return dialWebsocket(ctx, d.Url, d.TlsConfig)
 }
 
 // Returns a connected socket or fails with an error
-func dialWebsocket(url string, tlsConfig *tls.Config) (*wsPipe, error) {
-	ctx, _ := context.WithTimeout(context.Background(), 10 * time.Second)
+func dialWebsocket(ctx context.Context, url string, tlsConfig *tls.Config) (*wsPipe, error) {
 	conn, err := dialWs(ctx, url, tlsConfig)
 	if err != nil {
 		return nil, err

@@ -4,13 +4,16 @@ go 1.26.0
 
 require (
 	github.com/coder/websocket v1.8.15
+	github.com/quic-go/quic-go v0.63.0
+	github.com/quic-go/webtransport-go v0.13.0
 	github.com/rs/zerolog v1.35.1
 	github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b
 	github.com/unitoftime/cod v0.0.0-20230626194639-7603fae7c5d2
-	github.com/unitoftime/rtcnet v0.0.0-20261005101955-e093726493c6
+	github.com/unitoftime/rtcnet v0.0.0-20261005224721-8e494284bb14
 )
 
 require (
+	github.com/dunglas/httpsfv v1.1.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
@@ -30,9 +33,11 @@ require (
 	github.com/pion/transport/v5 v5.1.1 // indirect
 	github.com/pion/turn/v5 v5.1.2 // indirect
 	github.com/pion/webrtc/v4 v4.2.22 // indirect
+	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/wlynxg/anet v0.0.5 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 )

@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"net"
 )
 
@@ -8,16 +9,17 @@ type TcpDialer struct {
 	Url string
 	// TlsConfig *tls.Config
 }
-func (d TcpDialer) DialPipe() (Pipe, error) {
+func (d TcpDialer) DialPipe(ctx context.Context) (Pipe, error) {
 	_, host := parseSchemeHost(d.Url)
-	return dialTcp(host)
+	return dialTcp(ctx, host)
 }
 
 type tcpPipe struct {
 	conn net.Conn
 }
-func dialTcp(host string) (*tcpPipe, error) {
-	conn, err := net.Dial("tcp", host)
+func dialTcp(ctx context.Context, host string) (*tcpPipe, error) {
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(ctx, "tcp", host)
 	if err != nil {
 		return nil, err
 	}

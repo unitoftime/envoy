@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math/rand"
@@ -10,6 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 )
+
+// The longest a single dial can take. Dialers that want to give up sooner bound themselves, see FallbackDialer
+const dialTimeout = 30 * time.Second
 
 // --------------------------------------------------------------------------------
 // - Transport based sockets
@@ -217,7 +221,9 @@ func (s *PipeSocket) redial() {
 			return
 		}
 
-		trans, err := s.dialer.DialPipe()
+		ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
+		trans, err := s.dialer.DialPipe(ctx)
+		cancel()
 		if err != nil {
 			logger.Error().
 				Err(err).

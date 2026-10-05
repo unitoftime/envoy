@@ -1,6 +1,7 @@
 package net
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -92,7 +93,37 @@ func NewDialSocket(dialer Dialer) Socket {
 }
 
 type Dialer interface {
-	DialPipe() (Pipe, error)
+	// Dials a new pipe, giving up once the context is done. The context only bounds the dial, the returned pipe outlives it
+	DialPipe(context.Context) (Pipe, error)
+}
+
+// Dials with each attempt in order, and returns the first pipe that connects
+type FallbackDialer []DialAttempt
+
+type DialAttempt struct {
+	Dialer Dialer
+	Timeout time.Duration // How long this attempt gets to connect before we move on to the next one
+}
+
+func (d FallbackDialer) DialPipe(ctx context.Context) (Pipe, error) {
+	var errs []error
+	for i, attempt := range d {
+		attemptCtx, cancel := context.WithTimeout(ctx, attempt.Timeout)
+		pipe, err := attempt.Dialer.DialPipe(attemptCtx)
+		cancel()
+		if err == nil {
+			return pipe, nil
+		}
+
+		logger.Warn().Err(err).Int("Attempt", i).Msg("Envoy.FallbackDialer failed to dial")
+		errs = append(errs, err)
+
+		if ctx.Err() != nil {
+			break // We are out of time for every attempt
+		}
+	}
+
+	return nil, errors.Join(errs...)
 }
 
 // TODO: Just pass host in directly instead of scheme (so we dont have to use this func)
@@ -140,6 +171,8 @@ func (c *ListenConfig) Listen() (Listener, error) {
 		return newWebsocketListener(c)
 	} else if c.scheme == "webrtc" {
 		return newWebRtcListener(c)
+	} else if c.scheme == "webtransport" {
+		return newWebTransportListener(c)
 	} else if c.scheme == "ws" {
 		panic("Not implemented yet")
 	} else {
