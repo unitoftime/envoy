@@ -130,8 +130,14 @@ type clientSetter interface {
 	setClient(rpcClient)
 }
 
+// A registered rpc handler, and how it gets executed
+type registeredRpc struct {
+	fn HandlerFunc
+	async bool // If true, each request is handled on its own goroutine
+}
+
 type RpcHandler interface {
-	Handler() (reflect.Type, HandlerFunc)
+	Handler() (reflect.Type, registeredRpc)
 }
 
 type MsgHandler interface {
@@ -175,6 +181,7 @@ func (d MsgDef[A]) SendGetSize(msg A) (int, error) {
 // RPC Definition
 type RpcDef[Req, Resp any] struct {
 	handler HandlerFunc
+	async bool
 	client rpcClient
 }
 
@@ -194,6 +201,14 @@ func (d RpcDef[Req, Resp]) RespType() any {
 
 func (d *RpcDef[Req, Resp]) Register(handler func(Req) Resp) {
 	d.handler = makeRpcHandler(handler)
+	d.async = false
+}
+
+// Like Register, but each request is handled on its own goroutine, so a slow handler doesn't block the connection from reading
+// Warning: The handler can run concurrently with itself and with every other handler on the connection. It loses its ordering with everything else that is received
+func (d *RpcDef[Req, Resp]) RegisterAsync(handler func(Req) Resp) {
+	d.handler = makeRpcHandler(handler)
+	d.async = true
 }
 
 func (d RpcDef[Req, Resp]) CallTimeout(req Req, timeout time.Duration) (Resp, error) {
@@ -209,9 +224,9 @@ func (d RpcDef[Req, Resp]) Call(req Req) (Resp, error) {
 	return d.CallTimeout(req, 15 * time.Second) // Note: Default is kinda high
 }
 
-func (d RpcDef[Req, Resp]) Handler() (reflect.Type, HandlerFunc) {
+func (d RpcDef[Req, Resp]) Handler() (reflect.Type, registeredRpc) {
 	var req Req
-	return reflect.TypeOf(req), d.handler
+	return reflect.TypeOf(req), registeredRpc{d.handler, d.async}
 }
 
 // Interface Definition
@@ -310,7 +325,7 @@ type Client[S, C any] struct {
 
 	serviceDef, clientDef serviceDef
 
-	handlers map[reflect.Type]HandlerFunc
+	handlers map[reflect.Type]registeredRpc
 	messageHandlers map[reflect.Type]MessageHandlerFunc
 
 	reqLock sync.Mutex
@@ -328,7 +343,7 @@ func newClient[S, C any](serviceDef, clientDef serviceDef) *Client[S, C] {
 		serviceDef: serviceDef,
 		clientDef: clientDef,
 
-		handlers: make(map[reflect.Type]HandlerFunc),
+		handlers: make(map[reflect.Type]registeredRpc),
 		messageHandlers: make(map[reflect.Type]MessageHandlerFunc),
 		activeCalls: make(map[uint32]chan any),
 
@@ -474,6 +489,24 @@ func (c *Client[S, C]) handleRequest(buf *Buffer) error {
 		return fmt.Errorf("RPC Handler not set for type: %T", reqVal)
 	}
 
+	if handler.async {
+		// Note: reqVal is safe to hand off, because it was fully decoded out of the receive buffer
+		go func() {
+			err := c.respond(reqId, handler.fn, reqVal)
+			if err != nil {
+				logger.Error().
+					Err(err).
+					Msg("Envoy: Async Request Handler")
+			}
+		}()
+		return nil
+	}
+
+	return c.respond(reqId, handler.fn, reqVal)
+}
+
+// Executes the handler and sends its response back
+func (c *Client[S, C]) respond(reqId uint32, handler HandlerFunc, reqVal any) error {
 	anyResp := handler(reqVal)
 
 	// Build response
@@ -485,7 +518,7 @@ func (c *Client[S, C]) handleRequest(buf *Buffer) error {
 	sendBuf.WriteUint32(reqId)
 
 	// TODO: codify this to remove the alloc
-	err = c.serviceDef.Responses.Serialize(sendBuf, anyResp)
+	err := c.serviceDef.Responses.Serialize(sendBuf, anyResp)
 	if err != nil {
 		return err
 	}
@@ -557,7 +590,7 @@ func (client *Client[S, C]) registerHandlers(service any) {
 		switch rpcHandler := fieldAny.(type) {
 		case RpcHandler:
 			reqType, handler := rpcHandler.Handler()
-			if handler == nil { panic("All Handlers must be defined!") }
+			if handler.fn == nil { panic("All Handlers must be defined!") }
 			client.registerRpc(reqType, handler)
 		case MsgHandler:
 			msgType, handler := rpcHandler.Handler()
@@ -569,8 +602,8 @@ func (client *Client[S, C]) registerHandlers(service any) {
 	}
 }
 
-func (client *Client[S, C]) registerRpc(reqValType reflect.Type, handler HandlerFunc) {
-	if handler == nil { panic("Handler must not be nil!") }
+func (client *Client[S, C]) registerRpc(reqValType reflect.Type, handler registeredRpc) {
+	if handler.fn == nil { panic("Handler must not be nil!") }
 	_, exists := client.handlers[reqValType]
 	if exists {
 		panic("Cant reregister the same handler type")
