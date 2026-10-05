@@ -117,6 +117,8 @@ type ListenConfig struct {
 	HttpServer *http.Server // TODO - For Websockets only, maybe split up? - Note we have to wrap their Handler with our own handler!
 	OriginPatterns []string
 	IceServers []string
+	PublicIP string // WebRTC only: the IPv4 address clients reach the listener at. See rtcnet.ListenConfig
+	IceLite bool // WebRTC only: requires IceServers to be empty. See rtcnet.ListenConfig
 
 	// These are generated based on the upper config
 	scheme string

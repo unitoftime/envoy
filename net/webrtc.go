@@ -89,6 +89,8 @@ func newWebRtcListener(c *ListenConfig) (*rtcListener, error) {
 		TlsConfig: c.TlsConfig,
 		OriginPatterns: c.OriginPatterns,
 		IceServers: c.IceServers,
+		PublicIP: c.PublicIP,
+		IceLite: c.IceLite,
 	})
 	if err != nil {
 		return nil, err
