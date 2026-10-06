@@ -9,17 +9,17 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/smallnest/goframe v1.0.1-0.20230921044337-2eb334f3021b
 	github.com/unitoftime/cod v0.0.0-20230626194639-7603fae7c5d2
-	github.com/unitoftime/rtcnet v0.0.0-20261005224721-8e494284bb14
+	github.com/unitoftime/rtcnet v0.0.0-20261006102757-4fca6bb39c35
 )
 
 require (
 	github.com/dunglas/httpsfv v1.1.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/mattn/go-colorable v0.1.15 // indirect
+	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
 	github.com/pion/dtls/v3 v3.1.10 // indirect
-	github.com/pion/ice/v4 v4.4.5 // indirect
+	github.com/pion/ice/v4 v4.4.6 // indirect
 	github.com/pion/interceptor v0.1.49 // indirect
 	github.com/pion/logging v0.2.4 // indirect
 	github.com/pion/mdns/v2 v2.2.2 // indirect

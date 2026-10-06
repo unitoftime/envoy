@@ -15,6 +15,7 @@ import (
 type wsPipe struct {
 	conn net.Conn
 	cancel context.CancelFunc
+	localAddr, remoteAddr net.Addr // Note: The websocket's net.Conn only reports placeholders. A listener replaces them with the addresses of the request
 }
 func newWsPipe(wsConn *websocket.Conn) *wsPipe {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -23,6 +24,8 @@ func newWsPipe(wsConn *websocket.Conn) *wsPipe {
 	pipe := &wsPipe{
 		conn: conn,
 		cancel: cancel,
+		localAddr: conn.LocalAddr(),
+		remoteAddr: conn.RemoteAddr(),
 	}
 	return pipe
 }
@@ -31,10 +34,19 @@ func (t *wsPipe) Transport() string {
 	return "wss"
 }
 func (s *wsPipe) LocalAddr() net.Addr {
-	return s.conn.LocalAddr()
+	return s.localAddr
 }
 func (s *wsPipe) RemoteAddr() net.Addr {
-	return s.conn.RemoteAddr()
+	return s.remoteAddr
+}
+
+// The peer of an http request, which the server only tells us as text
+type requestAddr string
+func (a requestAddr) Network() string {
+	return "tcp"
+}
+func (a requestAddr) String() string {
+	return string(a)
 }
 
 func (t *wsPipe) Read(b []byte) (int, error) {
@@ -129,6 +141,8 @@ func (l *WebsocketListener) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Build the socket and push to channel
 	pipe := newWsPipe(conn)
+	pipe.localAddr = l.addr
+	pipe.remoteAddr = requestAddr(r.RemoteAddr)
 	sock := newAcceptedSocket(pipe)
 	l.pendingAccepts <- sock
 }
