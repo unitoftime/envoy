@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -418,38 +419,54 @@ func (c *Client[S, C]) start() {
 				continue
 			}
 
-			buf := NewBufferFrom(recvBuf)
-			wireType := buf.ReadUint8()
-
-			switch wireType {
-			case wireTypeRequest:
-				err := c.handleRequest(buf)
-				if err != nil {
-					logger.Error().
-						Err(err).
-						Msg("Envoy: Request Handler")
-				}
-			case wireTypeResponse:
-				err := c.handleResponse(buf)
-				if err != nil {
-					logger.Error().
-						Err(err).
-						Msg("Envoy: Response Handler")
-				}
-			case wireTypeMessage:
-				err := c.handleMessage(buf)
-				if err != nil {
-					logger.Error().
-						Err(err).
-						Msg("Envoy: Message Handler")
-				}
-			default:
-				logger.Error().
-					Uint8("wireType", wireType).
-					Msg("Envoy: Message Handler")
-			}
+			// Note: Only the bytes we just read belong to this message. The rest of the buffer still holds older ones
+			c.handleRecv(NewBufferFrom(recvBuf[:n]))
 		}
 	}()
+}
+
+// Decodes and handles one received message
+// Note: The bytes come off the wire, so a panic in here only closes this socket. Otherwise one bad message would take down the whole process, with every other socket on it
+func (c *Client[S, C]) handleRecv(buf *Buffer) {
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error().
+				Any("recover", r).
+				Str("stack", string(debug.Stack())).
+				Msg("Envoy: Recovered from panic, closing socket")
+			c.sock.Close()
+		}
+	}()
+
+	wireType := buf.ReadUint8()
+
+	switch wireType {
+	case wireTypeRequest:
+		err := c.handleRequest(buf)
+		if err != nil {
+			logger.Error().
+				Err(err).
+				Msg("Envoy: Request Handler")
+		}
+	case wireTypeResponse:
+		err := c.handleResponse(buf)
+		if err != nil {
+			logger.Error().
+				Err(err).
+				Msg("Envoy: Response Handler")
+		}
+	case wireTypeMessage:
+		err := c.handleMessage(buf)
+		if err != nil {
+			logger.Error().
+				Err(err).
+				Msg("Envoy: Message Handler")
+		}
+	default:
+		logger.Error().
+			Uint8("wireType", wireType).
+			Msg("Envoy: Message Handler")
+	}
 }
 
 func (c *Client[S, C]) handleResponse(buf *Buffer) error {
