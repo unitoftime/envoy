@@ -23,7 +23,7 @@ type PipeSocket struct {
 
 	pipe Pipe         // The underlying network connection to send and receive on
 
-	// Note: sendMut I think is needed now that I'm using goframe
+	// Note: Framed pipes (tcp, webtransport) need their writes, and their reads, to never overlap. See framer
 	sendMut sync.Mutex    // The mutex for multiple threads writing at the same time
 	recvMut sync.Mutex    // The mutex for multiple threads reading at the same time
 

@@ -14,9 +14,18 @@ func (d TcpDialer) DialPipe(ctx context.Context) (Pipe, error) {
 	return dialTcp(ctx, host)
 }
 
+// A tcp connection, framed into messages
 type tcpPipe struct {
 	conn net.Conn
+	framer *framer
 }
+func newTcpPipe(conn net.Conn) *tcpPipe {
+	return &tcpPipe{
+		conn: conn,
+		framer: newFramer(conn),
+	}
+}
+
 func dialTcp(ctx context.Context, host string) (*tcpPipe, error) {
 	var dialer net.Dialer
 	conn, err := dialer.DialContext(ctx, "tcp", host)
@@ -24,9 +33,7 @@ func dialTcp(ctx context.Context, host string) (*tcpPipe, error) {
 		return nil, err
 	}
 
-	// Create a Framed connection and set it to our connection
-	framedConn := NewFrameConn(conn)
-	return &tcpPipe{framedConn}, nil
+	return newTcpPipe(conn), nil
 }
 
 func (t *tcpPipe) Transport() string {
@@ -40,11 +47,11 @@ func (s *tcpPipe) RemoteAddr() net.Addr {
 }
 
 func (t *tcpPipe) Read(b []byte) (int, error) {
-	return t.conn.Read(b)
+	return t.framer.Read(b)
 }
 
 func (t *tcpPipe) Write(b []byte) (int, error) {
-	return t.conn.Write(b)
+	return t.framer.Write(b)
 }
 
 func (t *tcpPipe) Close() error {
@@ -71,8 +78,7 @@ func (l *TcpListener) Accept() (Socket, error) {
 		return nil, err
 	}
 
-	pipe := &tcpPipe{NewFrameConn(c)}
-	return newAcceptedSocket(pipe), nil
+	return newAcceptedSocket(newTcpPipe(c)), nil
 }
 func (l *TcpListener) Close() error {
 	return l.listener.Close()
