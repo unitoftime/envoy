@@ -502,8 +502,9 @@ func (c *Client[S, C]) handleResponse(buf *Buffer) error {
 		return fmt.Errorf("disassociated response")
 	}
 
-	// TODO: Should the channel disassociate if the receive side has closed?
-	// Send the response to the appropriate call
+	// Note: Each call gets one response, so a late or duplicate one for this id is disassociated
+	// Note: This send never blocks, because the channel has room for the one response. The caller may have already timed out and stopped receiving, see generateReqId
+	delete(c.activeCalls, respId)
 	callChan <-respVal
 
 	return nil
@@ -751,7 +752,8 @@ func (c *Client[S, C]) generateReqId() (uint32, chan any) {
 	c.reqLock.Lock()
 	defer c.reqLock.Unlock()
 
-	respChan := make(chan any)
+	// Note: Buffered so that handleResponse can deliver while holding reqLock, even if the caller already timed out
+	respChan := make(chan any, 1)
 
 	// TODO - instead of a map could I use some other data structure? is it important that the Id is hard to guess? Should I use some other crypto-random-rng generator?
 	var rngId uint32
@@ -766,20 +768,11 @@ func (c *Client[S, C]) generateReqId() (uint32, chan any) {
 	return rngId, respChan
 }
 
+// Note: The call is already gone if its response was delivered, see handleResponse
 func (c *Client[S, C]) cleanupResponseChannel(id uint32) {
 	c.reqLock.Lock()
 	defer c.reqLock.Unlock()
 
-	channel, ok := c.activeCalls[id]
-	if !ok {
-		// This is weird, the channel didn't exist but should have. Probably not worth panicking on
-		logger.Error().
-			Msg("Envoy: Tried to cleanup channel that was already cleaned up")
-		return
-	}
-
-	close(channel)
-	c.activeCalls[id] = nil
 	delete(c.activeCalls, id)
 }
 
