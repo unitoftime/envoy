@@ -249,29 +249,31 @@ func NewInterfaceDef[S, C any]() InterfaceDef[S, C] {
 
 type Config struct {
 	MaxRecvPacketSize int // Default 65K
+	CloseOnInvalid bool // Close the socket on a message that is too big or doesn't decode, instead of dropping it. For peers that we never trust, ie players
 }
 
 // Returns the client side of the interface
 func (d InterfaceDef[S, C]) NewClient(config *Config) *Client[C, S] {
 	// Note: The C and S are reversed because we call the service and serve the client
 	client := newClient[C, S](d.clientApi, d.serviceApi)
-
-	if config != nil {
-		client.maxRecvPacketSize = config.MaxRecvPacketSize
-	}
-
+	client.applyConfig(config)
 	return client
 }
 
 // Returns the server side of the interface
 func (d InterfaceDef[S, C]) NewServer(config *Config) *Client[S, C] {
 	client := newClient[S, C](d.serviceApi, d.clientApi)
-
-	if config != nil {
-		client.maxRecvPacketSize = config.MaxRecvPacketSize
-	}
-
+	client.applyConfig(config)
 	return client
+}
+
+func (c *Client[S, C]) applyConfig(config *Config) {
+	if config == nil { return }
+
+	if config.MaxRecvPacketSize > 0 {
+		c.maxRecvPacketSize = config.MaxRecvPacketSize
+	}
+	c.closeOnInvalid = config.CloseOnInvalid
 }
 
 
@@ -334,6 +336,7 @@ type Client[S, C any] struct {
 
 	rng *rand.Rand
 	maxRecvPacketSize int
+	closeOnInvalid bool // See Config.CloseOnInvalid
 }
 
 func newClient[S, C any](serviceDef, clientDef serviceDef) *Client[S, C] {
@@ -410,12 +413,14 @@ func (c *Client[S, C]) start() {
 
 			if n >= len(recvBuf) {
 				// TODO: need to handle this case by dynamically resizing the receive buffer (within reason)
-				// Full message
-				logger.Error().
-					Int("msgSize", n).
-					Int("maxSize", len(recvBuf)).
-					Msg("Envoy: message was too big")
+				// Note: Some transports (ie websockets) hand us the rest of a message that didn't fit on the next read, so for a peer we don't trust the stream can't be read past this
+				err := fmt.Errorf("%w: message is at least %d bytes, the limit is %d", errInvalidMessage, n, len(recvBuf) - 1)
+				if c.closeOnInvalid {
+					c.closeInvalid(err)
+					return
+				}
 
+				logger.Error().Err(err).Msg("Envoy: message was too big")
 				continue
 			}
 
@@ -440,42 +445,54 @@ func (c *Client[S, C]) handleRecv(buf *Buffer) {
 
 	wireType := buf.ReadUint8()
 
+	var err error
 	switch wireType {
 	case wireTypeRequest:
-		err := c.handleRequest(buf)
-		if err != nil {
-			logger.Error().
-				Err(err).
-				Msg("Envoy: Request Handler")
-		}
+		err = c.handleRequest(buf)
 	case wireTypeResponse:
-		err := c.handleResponse(buf)
-		if err != nil {
-			logger.Error().
-				Err(err).
-				Msg("Envoy: Response Handler")
-		}
+		err = c.handleResponse(buf)
 	case wireTypeMessage:
-		err := c.handleMessage(buf)
-		if err != nil {
-			logger.Error().
-				Err(err).
-				Msg("Envoy: Message Handler")
-		}
+		err = c.handleMessage(buf)
 	default:
-		logger.Error().
-			Uint8("wireType", wireType).
-			Msg("Envoy: Message Handler")
+		err = fmt.Errorf("%w: unknown wire type %d", errInvalidMessage, wireType)
 	}
+	if err == nil { return }
+
+	if c.closeOnInvalid && errors.Is(err, errInvalidMessage) {
+		c.closeInvalid(err)
+		return
+	}
+
+	logger.Error().
+		Err(err).
+		Uint8("wireType", wireType).
+		Msg("Envoy: Recv Handler")
+}
+
+// Marks a message that an honest peer never sends, ie one that doesn't decode. See Config.CloseOnInvalid
+var errInvalidMessage = errors.New("invalid message")
+
+func invalidMessage(err error) error {
+	return fmt.Errorf("%w: %w", errInvalidMessage, err)
+}
+
+// Closes the socket of a peer that sent an invalid message. See Config.CloseOnInvalid
+// Note: Logged once, as nothing more is read from the socket after this
+func (c *Client[S, C]) closeInvalid(err error) {
+	logger.Warn().
+		Err(err).
+		Str("remoteAddr", c.sock.RemoteAddr().String()).
+		Msg("Envoy: Closing socket on invalid message")
+	c.sock.Close()
 }
 
 func (c *Client[S, C]) handleResponse(buf *Buffer) error {
 	respId, err := buf.ReadUint32()
-	if err != nil { return err } // TODO: Should this error inform the doRpc call?
+	if err != nil { return invalidMessage(err) } // TODO: Should this error inform the doRpc call?
 
 	// TODO: codify this to remove the alloc
 	respVal, err := c.clientDef.Responses.Deserialize(buf)
-	if err != nil { return err } // TODO: Should this error inform the doRpc call?
+	if err != nil { return invalidMessage(err) } // TODO: Should this error inform the doRpc call?
 
 	c.reqLock.Lock()
 	defer c.reqLock.Unlock()
@@ -494,16 +511,16 @@ func (c *Client[S, C]) handleResponse(buf *Buffer) error {
 
 func (c *Client[S, C]) handleRequest(buf *Buffer) error {
 	reqId, err := buf.ReadUint32()
-	if err != nil { return err }
+	if err != nil { return invalidMessage(err) }
 
 	// TODO: codify this to remove the alloc
 	reqVal, err := c.serviceDef.Requests.Deserialize(buf)
-	if err != nil { return err }
+	if err != nil { return invalidMessage(err) }
 	reqValType := reflect.TypeOf(reqVal)
 
 	handler, ok := c.handlers[reqValType]
 	if !ok {
-		return fmt.Errorf("RPC Handler not set for type: %T", reqVal)
+		return fmt.Errorf("%w: RPC Handler not set for type: %T", errInvalidMessage, reqVal)
 	}
 
 	if handler.async {
@@ -561,13 +578,13 @@ func (c *Client[S, C]) handleMessage(buf *Buffer) error {
 	// TODO: codify this to remove the alloc
 	msgVal, err := c.serviceDef.Requests.Deserialize(buf)
 	if err != nil {
-		return err
+		return invalidMessage(err)
 	}
 	msgValType := reflect.TypeOf(msgVal)
 
 	handler, ok := c.messageHandlers[msgValType]
 	if !ok {
-		return fmt.Errorf("Message Handler not set for type: %T", msgVal)
+		return fmt.Errorf("%w: Message Handler not set for type: %T", errInvalidMessage, msgVal)
 	}
 
 	handler(msgVal)
