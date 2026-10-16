@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/quic-go/quic-go"
@@ -34,19 +35,100 @@ func wtQuicConfig() *quic.Config {
 	}
 }
 
+// A connection whose unsent writes grow past this is treated as dead
+const wtMaxPendingWrite = 4 << 20
+
+var errWtWriteBacklog = errors.New("envoy: webtransport connection fell too far behind on writes")
+
+// Writes are queued and sent by a writer goroutine, so that Write never waits on the network
+// Note: quic-go's Write waits whenever the congestion window is full, so without the queue every network hiccup stalls the writer (on a client, that's usually the frame). See runWriter
 type quicStream struct {
 	*webtransport.Stream
 	session *webtransport.Session
+
+	writeMu sync.Mutex
+	pending []byte // Written, but not yet taken by the writer
+	writeErr error // Set once the writer fails, after which every write fails
+	pendingSignal chan struct{} // Wakes the writer when there is something pending
+}
+
+func newQuicStream(stream *webtransport.Stream, session *webtransport.Session) *quicStream {
+	s := &quicStream{
+		Stream: stream,
+		session: session,
+		pendingSignal: make(chan struct{}, 1),
+	}
+	go s.runWriter()
+	return s
+}
+
+// Queues b to be sent, in order with every other write
+func (s *quicStream) Write(b []byte) (int, error) {
+	s.writeMu.Lock()
+	if s.writeErr != nil {
+		err := s.writeErr
+		s.writeMu.Unlock()
+		return 0, err
+	}
+	if len(s.pending) + len(b) > wtMaxPendingWrite {
+		s.writeMu.Unlock()
+		s.Close()
+		return 0, errWtWriteBacklog
+	}
+	s.pending = append(s.pending, b...)
+	s.writeMu.Unlock()
+
+	select {
+	case s.pendingSignal <- struct{}{}:
+	default: // The writer is already signaled
+	}
+	return len(b), nil
+}
+
+// Sends everything that is pending, in one write, until the session closes
+// Note: The two buffers swap roles each time, so nothing is allocated once they have grown
+func (s *quicStream) runWriter() {
+	var sending []byte
+	for {
+		select {
+		case <-s.pendingSignal:
+		case <-s.session.Context().Done():
+			s.setWriteErr(net.ErrClosed)
+			return
+		}
+
+		s.writeMu.Lock()
+		sending, s.pending = s.pending, sending[:0]
+		s.writeMu.Unlock()
+		if len(sending) == 0 { continue }
+
+		_, err := s.Stream.Write(sending)
+		if err != nil {
+			s.setWriteErr(err)
+
+			// Note: The read side then fails too, which is how the socket finds out
+			s.Close()
+			return
+		}
+	}
+}
+
+// Makes every write from now on fail with err, because nothing is sending them anymore
+func (s *quicStream) setWriteErr(err error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	s.writeErr = err
+	s.pending = nil
 }
 
 // Note: Closing the session also closes its stream, which unblocks any read or write that is waiting on it
-func (s quicStream) Close() error {
+func (s *quicStream) Close() error {
 	return s.session.CloseWithError(0, "")
 }
-func (s quicStream) LocalAddr() net.Addr {
+func (s *quicStream) LocalAddr() net.Addr {
 	return s.session.LocalAddr()
 }
-func (s quicStream) RemoteAddr() net.Addr {
+func (s *quicStream) RemoteAddr() net.Addr {
 	return s.session.RemoteAddr()
 }
 
@@ -67,7 +149,7 @@ func dialWtStream(ctx context.Context, endpoint string, tlsConfig *tls.Config) (
 		return nil, err
 	}
 
-	return quicStream{stream, session}, nil
+	return newQuicStream(stream, session), nil
 }
 
 // --------------------------------------------------------------------------------
@@ -189,7 +271,7 @@ func acceptWtPipe(ctx context.Context, session *webtransport.Session) (*wtPipe, 
 	if err != nil {
 		return nil, err
 	}
-	pipe := newWtPipe(quicStream{stream, session})
+	pipe := newWtPipe(newQuicStream(stream, session))
 
 	// Consume the empty message that the dialer opened the stream with
 	deadline, _ := ctx.Deadline()
